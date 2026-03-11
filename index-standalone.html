@@ -1,0 +1,1129 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>3D 模型查看器 - 支持 STP/GLB/GLTF</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Microsoft YaHei', Arial, sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .header {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            padding: 15px 30px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .header h1 {
+            color: #fff;
+            font-size: 20px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .header .tech-badge {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 5px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            color: white;
+        }
+
+        .container {
+            flex: 1;
+            display: flex;
+            position: relative;
+            min-height: calc(100vh - 80px);
+        }
+
+        #canvas-container {
+            flex: 1;
+            width: 100%;
+            min-height: 600px;
+        }
+
+        .sidebar {
+            position: absolute;
+            top: 80px;
+            left: 20px;
+            width: 280px;
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 15px;
+            padding: 20px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            color: white;
+            z-index: 100;
+        }
+
+        .sidebar h2 {
+            font-size: 16px;
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .file-info {
+            background: rgba(255, 255, 255, 0.05);
+            padding: 15px;
+            border-radius: 10px;
+            margin-bottom: 15px;
+        }
+
+        .file-info h3 {
+            font-size: 14px;
+            margin-bottom: 10px;
+            color: #667eea;
+        }
+
+        .file-info p {
+            font-size: 12px;
+            color: rgba(255, 255, 255, 0.7);
+            margin-bottom: 5px;
+            word-break: break-all;
+        }
+
+        .controls {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+
+        .control-btn {
+            padding: 10px;
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 8px;
+            color: white;
+            font-size: 12px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .control-btn:hover {
+            background: rgba(255, 255, 255, 0.2);
+            transform: translateY(-2px);
+        }
+
+        .control-btn.active {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border-color: transparent;
+        }
+
+        .stats {
+            background: rgba(255, 255, 255, 0.05);
+            padding: 15px;
+            border-radius: 10px;
+        }
+
+        .stats h3 {
+            font-size: 14px;
+            margin-bottom: 10px;
+            color: #667eea;
+        }
+
+        .stat-item {
+            display: flex;
+            justify-content: space-between;
+            font-size: 12px;
+            margin-bottom: 5px;
+            color: rgba(255, 255, 255, 0.8);
+        }
+
+        .stat-value {
+            color: #667eea;
+            font-weight: bold;
+        }
+
+        .loading-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(26, 26, 46, 0.95);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+
+        .loading-spinner {
+            width: 60px;
+            height: 60px;
+            border: 4px solid rgba(102, 126, 234, 0.3);
+            border-top-color: #667eea;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-bottom: 20px;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .loading-text {
+            color: white;
+            font-size: 16px;
+            margin-bottom: 10px;
+        }
+
+        .loading-progress {
+            color: rgba(255, 255, 255, 0.6);
+            font-size: 14px;
+        }
+
+        .hidden {
+            display: none !important;
+        }
+
+        .help-panel {
+            position: absolute;
+            bottom: 20px;
+            right: 20px;
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 15px;
+            padding: 20px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            color: white;
+            z-index: 100;
+            max-width: 300px;
+        }
+
+        .help-panel h3 {
+            font-size: 14px;
+            margin-bottom: 10px;
+            color: #667eea;
+        }
+
+        .help-panel ul {
+            font-size: 12px;
+            color: rgba(255, 255, 255, 0.7);
+            margin-left: 15px;
+        }
+
+        .help-panel li {
+            margin-bottom: 5px;
+        }
+
+        .error-message {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(220, 53, 69, 0.9);
+            color: white;
+            padding: 30px;
+            border-radius: 15px;
+            text-align: center;
+            z-index: 2000;
+            max-width: 500px;
+        }
+
+        .error-message h2 {
+            font-size: 18px;
+            margin-bottom: 15px;
+        }
+
+        .error-message p {
+            font-size: 14px;
+            margin-bottom: 10px;
+        }
+
+        .error-message button {
+            margin-top: 15px;
+            padding: 10px 20px;
+            background: white;
+            color: #dc3545;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+
+        .help-panel a {
+            color: #667eea;
+            text-decoration: underline;
+        }
+
+        .help-panel a:hover {
+            color: #764ba2;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>
+            🦞 3D 模型查看器
+            <span class="tech-badge">ES6 模块版</span>
+        </h1>
+        <div style="color: rgba(255,255,255,0.6); font-size: 12px;">
+            无需 CDN，完全本地运行
+        </div>
+    </div>
+
+    <div class="container">
+        <div id="canvas-container"></div>
+
+        <div class="sidebar">
+            <h2>📊 模型信息</h2>
+            
+            <div class="file-info">
+                <h3>📁 当前文件</h3>
+                <p><strong>文件名:</strong> <span id="fileName">page101.stp</span></p>
+                <p><strong>大小:</strong> <span id="fileSize">-</span></p>
+                <p><strong>状态:</strong> <span id="loadStatus">等待加载...</span></p>
+            </div>
+
+            <h2>🎮 显示控制</h2>
+            <div class="controls">
+                <button class="control-btn active" onclick="toggleWireframe(this)">线框模式</button>
+                <button class="control-btn" onclick="toggleAutoRotate(this)">自动旋转</button>
+                <button class="control-btn" onclick="resetCamera()">重置视角</button>
+                <button class="control-btn" onclick="fitToView()">适配视图</button>
+            </div>
+
+            <div class="stats">
+                <h3>📈 统计信息</h3>
+                <div class="stat-item">
+                    <span>顶点数:</span>
+                    <span class="stat-value" id="vertexCount">-</span>
+                </div>
+                <div class="stat-item">
+                    <span>三角形数:</span>
+                    <span class="stat-value" id="triangleCount">-</span>
+                </div>
+                <div class="stat-item">
+                    <span>对象数:</span>
+                    <span class="stat-value" id="objectCount">-</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="help-panel">
+            <h3>💡 操作说明</h3>
+            <ul>
+                <li>📁 支持格式: STP/GLB/GLTF</li>
+                <li>🔗 URL参数: ?model=文件名</li>
+                <li>🖱️ 左键拖拽 - 旋转模型</li>
+                <li>🖱️ 滚轮 - 缩放模型</li>
+                <li>⌨️ 上下左右键 - 平移模型</li>
+                <li>⌨️ R 键 - 重置视角</li>
+                <li>⌨️ F 键 - 适配视图</li>
+            </ul>
+        </div>
+
+        <div class="help-panel" style="max-width: 350px; left: 20px; right: auto; bottom: 20px; top: auto;">
+            <h3>📜 开源声明</h3>
+            <p style="font-size: 11px; color: rgba(255,255,255,0.7); line-height: 1.6;">
+                本工具基于以下开源软件：
+            </p>
+            <ul style="font-size: 11px; color: rgba(255,255,255,0.7); margin-left: 15px; line-height: 1.6;">
+                <li><strong>Three.js</strong> - MIT License</li>
+                <li><strong>occt-import-js</strong> - LGPL-3.0 License</li>
+            </ul>
+            <p style="font-size: 11px; color: rgba(255,255,255,0.7); line-height: 1.6; margin-top: 10px;">
+                本工具采用 <strong>LGPL-3.0</strong> 协议开源。<br>
+                查看 <a href="./LICENSE" target="_blank" style="color: #667eea;">LICENSE</a> 文件了解详情。
+            </p>
+        </div>
+
+        <div class="loading-overlay" id="loadingOverlay">
+            <div class="loading-spinner"></div>
+            <div class="loading-text" id="loadingText">正在加载模型...</div>
+            <div class="loading-progress" id="loadingProgress">初始化中...</div>
+        </div>
+
+        <div class="error-message hidden" id="errorMessage">
+            <h2>❌ 加载失败</h2>
+            <p id="errorText">发生未知错误</p>
+            <button onclick="location.reload()">重试</button>
+        </div>
+    </div>
+
+    <!-- Import map 来解析 three 模块 -->
+    <script type="importmap">
+    {
+        "imports": {
+            "three": "./js/three.module.min.js",
+            "three/addons/": "./js/"
+        }
+    }
+    </script>
+
+    <!-- 引入 occt-import-js (非模块方式) -->
+    <script src="./js/occt-import-js.js"></script>
+    
+    <!-- 使用 ES6 模块方式引入 Three.js 和 GLTFLoader -->
+    <script type="module">
+        /**
+         * 3D 模型查看器 - 支持 STP/GLB/GLTF 格式
+         * 
+         * Copyright (C) 2024
+         * 
+         * This program is free software: you can redistribute it and/or modify
+         * it under the terms of the GNU Lesser General Public License as published by
+         * the Free Software Foundation, either version 3 of the License, or
+         * (at your option) any later version.
+         * 
+         * This program is distributed in the hope that it will be useful,
+         * but WITHOUT ANY WARRANTY; without even the implied warranty of
+         * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+         * GNU Lesser General Public License for more details.
+         * 
+         * You should have received a copy of the GNU Lesser General Public License
+         * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+         * 
+         * Open Source Libraries Used:
+         * - Three.js (MIT License) - https://threejs.org/
+         * - occt-import-js (LGPL-3.0) - https://github.com/kaaes/occt-import-js
+         */
+
+        // 引入 Three.js 和 GLTFLoader
+        import * as THREE from 'three';
+        import { GLTFLoader } from './js/GLTFLoader.js';
+
+        // 全局变量
+        let scene, camera, renderer;
+        let currentModel = null;
+        let isWireframe = false;
+        let isAutoRotate = false;
+
+        // 模型中心点
+        let modelCenter = new THREE.Vector3(0, 0, 0);
+
+        // 鼠标控制变量
+        let isMouseDown = false;
+        let mouseX = 0, mouseY = 0;
+        let targetRotationX = 0, targetRotationY = 0;
+        let cameraDistance = 30;
+        let cameraOffsetX = 0, cameraOffsetY = 0;
+
+        // 键盘控制变量
+        let keys = {
+            ArrowUp: false,
+            ArrowDown: false,
+            ArrowLeft: false,
+            ArrowRight: false
+        };
+        let panSpeed = 0.5;
+
+        // 从 URL 参数获取模型文件路径，默认使用 page101.stp
+        function getModelFilePath() {
+            const urlParams = new URLSearchParams(window.location.search);
+            const modelParam = urlParams.get('model');
+            if (modelParam) {
+                return modelParam;
+            }
+            return './page101.stp';
+        }
+
+        const modelFilePath = getModelFilePath();
+
+        // 初始化
+        async function init() {
+            try {
+                updateLoadingText('初始化 Three.js...');
+                
+                // 创建场景
+                scene = new THREE.Scene();
+                scene.background = new THREE.Color(0x1a1a2e);
+
+                // 创建相机 - 增大裁剪范围
+                const container = document.getElementById('canvas-container');
+                const aspect = container.clientWidth / container.clientHeight;
+                camera = new THREE.PerspectiveCamera(45, aspect, 0.01, 10000);
+                updateCameraPosition();
+
+                // 创建渲染器
+                renderer = new THREE.WebGLRenderer({ antialias: true });
+                renderer.setSize(container.clientWidth, container.clientHeight);
+                renderer.setPixelRatio(window.devicePixelRatio);
+                renderer.shadowMap.enabled = true;
+                container.appendChild(renderer.domElement);
+
+                // 添加光源
+                addLights();
+
+                // 添加网格辅助线
+                addGridHelper();
+
+                // 添加坐标轴辅助线
+                addAxesHelper();
+
+                // 添加鼠标事件
+                setupMouseControls(container);
+
+                // 窗口大小调整
+                window.addEventListener('resize', onWindowResize);
+
+                // 键盘事件
+                window.addEventListener('keydown', onKeyDown);
+                window.addEventListener('keyup', onKeyUp);
+
+                // 开始动画循环
+                animate();
+
+                // 更新显示的文件名
+                const fileName = modelFilePath.split('/').pop();
+                document.getElementById('fileName').textContent = fileName;
+                
+                updateLoadingText('准备加载模型...');
+                
+                // 根据文件扩展名选择加载器
+                const fileExtension = modelFilePath.toLowerCase().split('.').pop();
+                if (fileExtension === 'glb' || fileExtension === 'gltf') {
+                    await loadGLBModel();
+                } else {
+                    await loadSTPModel();
+                }
+
+            } catch (error) {
+                console.error('初始化失败:', error);
+                showError(error.message);
+            }
+        }
+
+        // 更新相机位置
+        function updateCameraPosition() {
+            let x = cameraDistance * Math.sin(targetRotationY) * Math.cos(targetRotationX);
+            let y = cameraDistance * Math.sin(targetRotationX);
+            let z = cameraDistance * Math.cos(targetRotationY) * Math.cos(targetRotationX);
+            
+            // 加上平移偏移量和模型中心点
+            camera.position.x = x + modelCenter.x + cameraOffsetX;
+            camera.position.y = y + modelCenter.y + cameraOffsetY;
+            camera.position.z = z + modelCenter.z;
+            
+            camera.lookAt(modelCenter.x + cameraOffsetX, modelCenter.y + cameraOffsetY, modelCenter.z);
+        }
+
+        // 设置鼠标控制
+        function setupMouseControls(container) {
+            // 只保留左键旋转和滚轮缩放
+            container.addEventListener('mousedown', onMouseDown, { passive: false, capture: true });
+            container.addEventListener('mousemove', onMouseMove, { passive: false, capture: true });
+            container.addEventListener('mouseup', onMouseUp, { passive: false, capture: true });
+            container.addEventListener('wheel', onMouseWheel, { passive: false, capture: true });
+            container.addEventListener('contextmenu', (e) => e.preventDefault(), { passive: false, capture: true });
+        }
+
+        // 鼠标按下
+        function onMouseDown(event) {
+            event.preventDefault();
+            event.stopPropagation();
+            
+            if (event.button === 0) {
+                isMouseDown = true;
+            }
+            mouseX = event.clientX;
+            mouseY = event.clientY;
+        }
+
+        // 鼠标移动
+        function onMouseMove(event) {
+            if (isMouseDown) {
+                const deltaX = event.clientX - mouseX;
+                const deltaY = event.clientY - mouseY;
+                
+                targetRotationY += deltaX * 0.01;
+                targetRotationX += deltaY * 0.01;
+                
+                // 限制垂直旋转角度
+                targetRotationX = Math.max(-Math.PI / 2 + 0.1, Math.min(Math.PI / 2 - 0.1, targetRotationX));
+                
+                updateCameraPosition();
+            }
+            
+            mouseX = event.clientX;
+            mouseY = event.clientY;
+        }
+
+        // 鼠标松开
+        function onMouseUp(event) {
+            isMouseDown = false;
+        }
+
+        // 鼠标滚轮
+        function onMouseWheel(event) {
+            event.preventDefault();
+            cameraDistance += event.deltaY * 0.05;
+            cameraDistance = Math.max(5, Math.min(200, cameraDistance));
+            updateCameraPosition();
+        }
+
+        // 添加光源
+        function addLights() {
+            // 环境光 - 更亮
+            const ambientLight = new THREE.AmbientLight(0xffffff, 1.2);
+            scene.add(ambientLight);
+
+            // 主光源 - 更亮
+            const directionalLight1 = new THREE.DirectionalLight(0xffffff, 2.0);
+            directionalLight1.position.set(10, 20, 10);
+            directionalLight1.castShadow = true;
+            scene.add(directionalLight1);
+
+            // 辅助光源1 - 右侧
+            const directionalLight2 = new THREE.DirectionalLight(0xffffff, 1.2);
+            directionalLight2.position.set(20, 10, 0);
+            scene.add(directionalLight2);
+
+            // 辅助光源2 - 左侧
+            const directionalLight3 = new THREE.DirectionalLight(0xffffff, 1.2);
+            directionalLight3.position.set(-20, 10, 0);
+            scene.add(directionalLight3);
+
+            // 辅助光源3 - 背面
+            const directionalLight4 = new THREE.DirectionalLight(0xffffff, 0.8);
+            directionalLight4.position.set(0, 10, -20);
+            scene.add(directionalLight4);
+
+            // 顶部点光源
+            const pointLight1 = new THREE.PointLight(0xffffff, 1.0, 200);
+            pointLight1.position.set(0, 40, 0);
+            scene.add(pointLight1);
+
+            // 底部补光
+            const pointLight2 = new THREE.PointLight(0xffffff, 0.5, 200);
+            pointLight2.position.set(0, -20, 0);
+            scene.add(pointLight2);
+        }
+
+        // 添加网格辅助线
+        function addGridHelper() {
+            const gridHelper = new THREE.GridHelper(100, 100, 0x444444, 0x222222);
+            scene.add(gridHelper);
+        }
+
+        // 添加坐标轴辅助线
+        function addAxesHelper() {
+            const axesHelper = new THREE.AxesHelper(10);
+            scene.add(axesHelper);
+        }
+
+        // 加载 STP 模型
+        async function loadSTPModel() {
+            try {
+                updateLoadingText('正在读取 STP 文件...');
+                updateLoadingProgress('读取文件...');
+
+                // 检查 occt-import-js 是否可用
+                if (typeof occtimportjs === 'undefined') {
+                    throw new Error('occt-import-js 未正确加载，请检查文件路径');
+                }
+
+                // 初始化 occt-import-js
+                updateLoadingProgress('初始化 OCCT...');
+                const occt = await occtimportjs();
+
+                // 读取 STP 文件
+                updateLoadingProgress('加载 STP 文件...');
+                const response = await fetch(modelFilePath);
+                
+                if (!response.ok) {
+                    throw new Error(`无法加载文件: ${response.status} ${response.statusText}`);
+                }
+
+                // 获取文件大小
+                const fileSize = response.headers.get('content-length');
+                if (fileSize) {
+                    document.getElementById('fileSize').textContent = formatFileSize(parseInt(fileSize));
+                }
+
+                const stpData = await response.arrayBuffer();
+                const fileBuffer = new Uint8Array(stpData);
+
+                updateLoadingProgress('解析 STP 文件...');
+                document.getElementById('loadStatus').textContent = '正在解析...';
+
+                // 使用 occt-import-js 解析 STP
+                const result = occt.ReadStepFile(fileBuffer);
+
+                console.log('📦 occt-import-js 返回的完整结果:', result);
+                console.log('📦 result.meshes:', result.meshes);
+
+                if (!result) {
+                    throw new Error('STP 文件解析失败：result 为空');
+                }
+
+                if (!result.meshes) {
+                    throw new Error('STP 文件解析失败：result.meshes 不存在');
+                }
+
+                if (result.meshes.length === 0) {
+                    throw new Error('STP 文件解析失败：没有找到网格数据');
+                }
+
+                // 先看看第一个网格的数据结构
+                if (result.meshes[0]) {
+                    console.log('🔍 第一个网格的数据结构:', Object.keys(result.meshes[0]));
+                    console.log('🔍 第一个网格完整数据:', result.meshes[0]);
+                }
+
+                updateLoadingProgress('创建 3D 网格...');
+                document.getElementById('loadStatus').textContent = '正在创建网格...';
+
+                // 创建模型组
+                const modelGroup = new THREE.Group();
+                let totalVertices = 0;
+                let totalTriangles = 0;
+
+                console.log('✅ 开始处理网格，数量:', result.meshes.length);
+
+                // 处理每个网格
+                result.meshes.forEach((meshData, index) => {
+                    console.log(`🔍 处理网格 ${index}，数据结构:`, meshData);
+                    
+                    const geometry = new THREE.BufferGeometry();
+                    
+                    // 根据 occt-import-js 文档的正确数据结构！
+                    let vertices = meshData.attributes?.position?.array;
+                    let indices = meshData.attributes?.index?.array;
+                    let normals = meshData.attributes?.normal?.array;
+                    let colors = meshData.attributes?.color?.array;
+                    
+                    console.log(`  网格 ${index} 属性:`, {
+                        hasVertices: !!vertices,
+                        hasIndices: !!indices,
+                        hasNormals: !!normals,
+                        hasColors: !!colors
+                    });
+                    
+                    // 尝试获取网格颜色信息
+                    let meshColor = null;
+                    if (meshData.color) {
+                        meshColor = meshData.color;
+                        console.log(`  网格 ${index}: 找到网格颜色`, meshColor);
+                    }
+                    
+                    // 设置顶点
+                    if (vertices && vertices.length > 0) {
+                        geometry.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3));
+                        totalVertices += vertices.length / 3;
+                        console.log(`  网格 ${index}: 找到 ${vertices.length / 3} 个顶点`);
+                    } else {
+                        console.log(`  网格 ${index}: 没有找到顶点数据!`);
+                    }
+
+                    // 设置法线
+                    if (normals && normals.length > 0) {
+                        geometry.setAttribute('normal', new THREE.Float32BufferAttribute(normals, 3));
+                    } else if (vertices && vertices.length > 0) {
+                        // 如果没有法线，计算一下
+                        geometry.computeVertexNormals();
+                    }
+
+                    // 设置顶点颜色（如果有）
+                    if (colors && colors.length > 0) {
+                        geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
+                        console.log(`  网格 ${index}: 找到顶点颜色数据`);
+                    }
+
+                    // 设置索引
+                    if (indices && indices.length > 0) {
+                        geometry.setIndex(new THREE.Uint32BufferAttribute(indices, 1));
+                        totalTriangles += indices.length / 3;
+                        console.log(`  网格 ${index}: 找到 ${indices.length / 3} 个三角形`);
+                    } else {
+                        console.log(`  网格 ${index}: 没有找到索引数据!`);
+                    }
+
+                    // 计算边界
+                    geometry.computeBoundingBox();
+                    geometry.computeBoundingSphere();
+
+                    console.log(`  网格 ${index} 边界盒:`, geometry.boundingBox);
+
+                    // 创建材质 - 优先使用模型颜色，否则使用默认颜色
+                    let material;
+                    if (colors && colors.length > 0) {
+                        // 有顶点颜色，使用顶点颜色
+                        material = new THREE.MeshPhongMaterial({
+                            vertexColors: true,
+                            shininess: 30,
+                            specular: 0x444444,
+                            side: THREE.DoubleSide,
+                            flatShading: false,
+                            depthWrite: true,
+                            depthTest: true
+                        });
+                        console.log(`  网格 ${index}: 使用顶点颜色材质`);
+                    } else if (meshColor) {
+                        // 有网格颜色，使用网格颜色
+                        material = new THREE.MeshPhongMaterial({
+                            color: new THREE.Color(meshColor.r, meshColor.g, meshColor.b),
+                            shininess: 30,
+                            specular: 0x444444,
+                            side: THREE.DoubleSide,
+                            flatShading: false,
+                            depthWrite: true,
+                            depthTest: true
+                        });
+                        console.log(`  网格 ${index}: 使用网格颜色材质`, meshColor);
+                    } else {
+                        // 没有颜色信息，使用默认材质
+                        material = new THREE.MeshPhongMaterial({
+                            color: 0xffffff,  // 白色
+                            shininess: 30,
+                            specular: 0x444444,
+                            side: THREE.DoubleSide,
+                            flatShading: false,
+                            depthWrite: true,
+                            depthTest: true
+                        });
+                        console.log(`  网格 ${index}: 使用默认材质`);
+                    }
+
+                    // 创建网格
+                    const mesh = new THREE.Mesh(geometry, material);
+                    mesh.castShadow = true;
+                    mesh.receiveShadow = true;
+                    
+                    modelGroup.add(mesh);
+                });
+
+                currentModel = modelGroup;
+                scene.add(currentModel);
+
+                console.log('✅ 模型已添加到场景');
+                console.log('  总顶点数:', totalVertices);
+                console.log('  总三角形数:', totalTriangles);
+                console.log('  对象数:', result.meshes.length);
+
+                // 更新统计信息
+                document.getElementById('vertexCount').textContent = totalVertices.toLocaleString();
+                document.getElementById('triangleCount').textContent = totalTriangles.toLocaleString();
+                document.getElementById('objectCount').textContent = result.meshes.length;
+                document.getElementById('loadStatus').textContent = '加载完成！';
+
+                // 适配视图
+                fitToView();
+
+                // 隐藏加载界面
+                updateLoadingProgress('完成！');
+                setTimeout(() => {
+                    document.getElementById('loadingOverlay').classList.add('hidden');
+                }, 500);
+
+                console.log('模型加载成功!');
+                console.log('顶点数:', totalVertices);
+                console.log('三角形数:', totalTriangles);
+                console.log('对象数:', result.meshes.length);
+
+            } catch (error) {
+                console.error('加载模型失败:', error);
+                showError(error.message);
+            }
+        }
+
+        // 加载 GLB/GLTF 模型
+        async function loadGLBModel() {
+            try {
+                updateLoadingText('正在读取 GLB 文件...');
+                updateLoadingProgress('读取文件...');
+
+                // 检查 GLTFLoader 是否可用
+                if (typeof GLTFLoader === 'undefined') {
+                    throw new Error('GLTFLoader 未正确加载，请检查文件路径');
+                }
+
+                // 创建 GLTFLoader 实例
+                const loader = new GLTFLoader();
+
+                updateLoadingProgress('加载 GLB 文件...');
+                document.getElementById('loadStatus').textContent = '正在加载...';
+
+                // 加载 GLB 模型
+                const gltf = await new Promise((resolve, reject) => {
+                    loader.load(
+                        modelFilePath,
+                        (gltf) => resolve(gltf),
+                        (xhr) => {
+                            // 进度回调
+                            if (xhr.lengthComputable) {
+                                const percentComplete = (xhr.loaded / xhr.total * 100).toFixed(0);
+                                updateLoadingProgress(`加载中: ${percentComplete}%`);
+                            }
+                        },
+                        (error) => reject(error)
+                    );
+                });
+
+                console.log('📦 GLTF 加载完成:', gltf);
+
+                updateLoadingProgress('处理模型...');
+                document.getElementById('loadStatus').textContent = '正在处理...';
+
+                // 获取模型场景
+                const modelScene = gltf.scene;
+                
+                // 计算统计信息
+                let totalVertices = 0;
+                let totalTriangles = 0;
+                let objectCount = 0;
+
+                modelScene.traverse((child) => {
+                    if (child.isMesh) {
+                        objectCount++;
+                        if (child.geometry) {
+                            const pos = child.geometry.attributes.position;
+                            if (pos) {
+                                totalVertices += pos.count;
+                            }
+                            const index = child.geometry.index;
+                            if (index) {
+                                totalTriangles += index.count / 3;
+                            } else if (pos) {
+                                totalTriangles += pos.count / 3;
+                            }
+                        }
+                        // 确保材质正确设置
+                        if (child.material) {
+                            child.material.side = THREE.DoubleSide;
+                            child.material.needsUpdate = true;
+                        }
+                    }
+                });
+
+                currentModel = modelScene;
+                scene.add(currentModel);
+
+                console.log('✅ 模型已添加到场景');
+                console.log('  总顶点数:', totalVertices);
+                console.log('  总三角形数:', totalTriangles);
+                console.log('  对象数:', objectCount);
+
+                // 更新统计信息
+                document.getElementById('vertexCount').textContent = totalVertices.toLocaleString();
+                document.getElementById('triangleCount').textContent = totalTriangles.toLocaleString();
+                document.getElementById('objectCount').textContent = objectCount;
+                document.getElementById('loadStatus').textContent = '加载完成！';
+
+                // 更新文件名显示
+                const fileName = modelFilePath.split('/').pop();
+                document.querySelector('.file-info p strong').parentNode.innerHTML = 
+                    `<strong>文件名:</strong> ${fileName}`;
+
+                // 适配视图
+                fitToView();
+
+                // 隐藏加载界面
+                updateLoadingProgress('完成！');
+                setTimeout(() => {
+                    document.getElementById('loadingOverlay').classList.add('hidden');
+                }, 500);
+
+                console.log('GLB 模型加载成功!');
+
+            } catch (error) {
+                console.error('加载 GLB 模型失败:', error);
+                showError(error.message);
+            }
+        }
+
+        // 适配视图
+        function fitToView() {
+            if (!currentModel) return;
+
+            console.log('🔍 开始适配视图...');
+            
+            const box = new THREE.Box3().setFromObject(currentModel);
+            const center = box.getCenter(new THREE.Vector3());
+            const size = box.getSize(new THREE.Vector3());
+            const maxDim = Math.max(size.x, size.y, size.z);
+            
+            console.log('  模型边界盒:', {
+                min: { x: box.min.x, y: box.min.y, z: box.min.z },
+                max: { x: box.max.x, y: box.max.y, z: box.max.z },
+                center: { x: center.x, y: center.y, z: center.z },
+                size: { x: size.x, y: size.y, z: size.z }
+            });
+            
+            // 设置模型中心点
+            modelCenter.copy(center);
+            
+            // 计算相机距离 - 用更大的系数确保模型完整显示
+            const fov = camera.fov * (Math.PI / 180);
+            cameraDistance = Math.abs(maxDim / Math.tan(fov / 2)) * 2.5;
+            cameraDistance = Math.max(10, Math.min(1000, cameraDistance));
+            
+            console.log('  相机距离:', cameraDistance);
+            console.log('  模型中心点:', modelCenter);
+            
+            // 设置相机位置和偏移量
+            targetRotationX = 0.5;
+            targetRotationY = 0.5;
+            cameraOffsetX = 0;
+            cameraOffsetY = 0;
+            
+            updateCameraPosition();
+            
+            console.log('✅ 视图适配完成');
+        }
+
+        // 重置相机
+        function resetCamera() {
+            targetRotationX = 0.5;
+            targetRotationY = 0.5;
+            cameraDistance = 30;
+            cameraOffsetX = 0;
+            cameraOffsetY = 0;
+            updateCameraPosition();
+        }
+
+        // 切换线框模式
+        function toggleWireframe(btn) {
+            isWireframe = !isWireframe;
+            btn.classList.toggle('active', isWireframe);
+
+            if (currentModel) {
+                currentModel.traverse((child) => {
+                    if (child.isMesh) {
+                        child.material.wireframe = isWireframe;
+                    }
+                });
+            }
+        }
+
+        // 切换自动旋转
+        function toggleAutoRotate(btn) {
+            isAutoRotate = !isAutoRotate;
+            btn.classList.toggle('active', isAutoRotate);
+        }
+
+        // 窗口大小调整
+        function onWindowResize() {
+            const container = document.getElementById('canvas-container');
+            camera.aspect = container.clientWidth / container.clientHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(container.clientWidth, container.clientHeight);
+        }
+
+        // 键盘按下事件
+        function onKeyDown(event) {
+            switch (event.key) {
+                case 'ArrowUp':
+                case 'ArrowDown':
+                case 'ArrowLeft':
+                case 'ArrowRight':
+                    keys[event.key] = true;
+                    event.preventDefault();
+                    break;
+                case 'r':
+                case 'R':
+                    resetCamera();
+                    break;
+                case 'f':
+                case 'F':
+                    fitToView();
+                    break;
+            }
+        }
+
+        // 键盘松开事件
+        function onKeyUp(event) {
+            switch (event.key) {
+                case 'ArrowUp':
+                case 'ArrowDown':
+                case 'ArrowLeft':
+                case 'ArrowRight':
+                    keys[event.key] = false;
+                    event.preventDefault();
+                    break;
+            }
+        }
+
+        // 更新键盘平移
+        function updateKeyboardPan() {
+            let panX = 0;
+            let panY = 0;
+
+            if (keys.ArrowUp) panY += panSpeed;
+            if (keys.ArrowDown) panY -= panSpeed;
+            if (keys.ArrowLeft) panX -= panSpeed;
+            if (keys.ArrowRight) panX += panSpeed;
+
+            if (panX !== 0 || panY !== 0) {
+                // 计算相机的右方向和上方向
+                const right = new THREE.Vector3();
+                const up = new THREE.Vector3(0, 1, 0);
+                
+                camera.getWorldDirection(right);
+                right.cross(up).normalize();
+                
+                // 应用平移
+                cameraOffsetX += right.x * panX;
+                cameraOffsetY += panY;
+                
+                updateCameraPosition();
+            }
+        }
+
+        // 动画循环
+        function animate() {
+            requestAnimationFrame(animate);
+            
+            // 更新键盘平移
+            updateKeyboardPan();
+            
+            if (isAutoRotate) {
+                targetRotationY += 0.01;
+                updateCameraPosition();
+            }
+            
+            renderer.render(scene, camera);
+        }
+
+        // 更新加载文本
+        function updateLoadingText(text) {
+            document.getElementById('loadingText').textContent = text;
+        }
+
+        // 更新加载进度
+        function updateLoadingProgress(text) {
+            document.getElementById('loadingProgress').textContent = text;
+        }
+
+        // 格式化文件大小
+        function formatFileSize(bytes) {
+            if (bytes === 0) return '0 B';
+            const k = 1024;
+            const sizes = ['B', 'KB', 'MB', 'GB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+        }
+
+        // 显示错误
+        function showError(message) {
+            document.getElementById('loadingOverlay').classList.add('hidden');
+            document.getElementById('errorText').textContent = message;
+            document.getElementById('errorMessage').classList.remove('hidden');
+            document.getElementById('loadStatus').textContent = '加载失败';
+        }
+
+        // 页面加载完成后初始化
+        window.addEventListener('load', init);
+    </script>
+</body>
+</html>
