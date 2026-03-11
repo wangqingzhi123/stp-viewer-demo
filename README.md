@@ -1,26 +1,49 @@
-# Three.js + occt-import-js STP 查看器
+# 3D 模型查看器 - 支持 STP/GLB/GLTF
 
-基于 **Three.js** 和 **occt-import-js** 的完全免费开源的 STP 3D 模型查看器！
+基于 **Three.js** 和 **occt-import-js** 的完全免费开源的 3D 模型查看器！
 
 ## ✨ 特性
 
 - 🎯 **完全免费开源** - 无需付费，无需授权
 - 🚀 **Three.js 引擎** - 业界最流行的 WebGL 3D 库
 - 🔧 **occt-import-js** - OpenCASCADE 的 WebAssembly 版本，专业解析 STP/STEP
+- 📦 **多格式支持** - 支持 STP/STEP、GLB、GLTF 格式
 - 🎮 **丰富的交互** - 旋转、缩放、平移、自动旋转
 - 📊 **实时统计** - 显示顶点数、三角形数、对象数
 - 💡 **美观的 UI** - 现代化的深色主题界面
-- ⌨️ **快捷键支持** - R 重置视角，F 适配视图
+- ⌨️ **快捷键支持** - 方向键平移，R 重置视角，F 适配视图
+- 🔗 **URL 参数** - 通过 `?model=文件名` 加载不同模型
+
+## 📜 开源协议
+
+本项目采用 **GNU Lesser General Public License v3.0 (LGPL-3.0)** 协议开源。
+
+详见 [LICENSE](LICENSE) 文件。
+
+## 📚 使用的开源库
+
+- **Three.js** - MIT License - https://threejs.org/
+- **occt-import-js** - LGPL-3.0 License - https://github.com/kaaes/occt-import-js
 
 ## 📁 文件说明
 
 ```
 stp-viewer-demo/
-├── index-threejs.html      # Three.js 版本的主页面（推荐使用！）
-├── occt-import-js.js       # OCCT 导入库（WebAssembly）
-├── page101.stp            # 示例 STP 模型文件
-├── README-ThreeJS.md      # 本文档
-└── README.md              # 原版说明
+├── LICENSE                    # LGPL-3.0 开源协议
+├── README.md                  # 本文档
+├── README-ThreeJS.md          # 旧版说明文档
+├── index-standalone.html      # 主程序文件（推荐使用！）
+├── js/
+│   ├── three.min.js           # Three.js 非模块版
+│   ├── three.module.min.js    # Three.js ES6 模块版
+│   ├── OrbitControls.js       # 轨道控制器
+│   ├── GLTFLoader.js          # GLB/GLTF 加载器
+│   ├── occt-import-js.js      # STP 解析器
+│   ├── occt-import-js.wasm    # STP 解析器 WebAssembly
+│   └── utils/
+│       └── BufferGeometryUtils.js  # 几何工具库
+├── DragonAttenuation.glb      # 示例 GLB 模型
+└── page101.stp               # 示例 STP 模型
 ```
 
 ## 🚀 快速开始
@@ -28,20 +51,36 @@ stp-viewer-demo/
 ### 1. 确认文件
 
 确保以下文件都在同一目录下：
-- `index-threejs.html`
-- `occt-import-js.js`
-- `page101.stp`（或你自己的 STP 文件）
+- `index-standalone.html`
+- `js/` 文件夹及其中的所有文件
+- 你的模型文件（.stp/.glb/.gltf）
 
-### 2. 修改模型路径（如果需要）
+### 2. 通过 URL 参数加载模型（推荐）
 
-如果要加载其他 STP 文件，编辑 `index-threejs.html`：
+```bash
+# 加载默认模型
+http://localhost:8080/index-standalone.html
 
-```javascript
-// 找到这一行，修改为你的 STP 文件路径
-const stpFilePath = './page101.stp';
+# 加载指定 STP 模型
+http://localhost:8080/index-standalone.html?model=your-model.stp
+
+# 加载指定 GLB 模型
+http://localhost:8080/index-standalone.html?model=your-model.glb
+
+# 加载指定 GLTF 模型
+http://localhost:8080/index-standalone.html?model=your-model.gltf
 ```
 
-### 3. 启动本地服务器
+### 3. 或修改代码中的默认模型路径
+
+编辑 `index-standalone.html`：
+
+```javascript
+// 找到这一行，修改为你的模型文件路径
+const modelFilePath = './your-model.stp';
+```
+
+### 4. 启动本地服务器
 
 **重要**：由于涉及到文件加载和 WebAssembly，必须使用本地服务器运行，不能直接双击打开 HTML 文件！
 
@@ -71,14 +110,14 @@ http-server -p 8080
 #### 方法三：使用 VS Code
 
 1. 安装 "Live Server" 插件
-2. 右键点击 `index-threejs.html`
+2. 右键点击 `index-standalone.html`
 3. 选择 "Open with Live Server"
 
-### 4. 访问页面
+### 5. 访问页面
 
 在浏览器中打开：
 ```
-http://localhost:8080/index-threejs.html
+http://localhost:8080/index-standalone.html
 ```
 
 ## 🎮 使用说明
@@ -89,7 +128,14 @@ http://localhost:8080/index-threejs.html
 |------|------|
 | 左键拖拽 | 旋转模型 |
 | 滚轮 | 缩放模型 |
-| 右键拖拽 | 平移模型 |
+
+### 键盘操作
+
+| 按键 | 说明 |
+|------|------|
+| ↑ ↓ ← → | 平移模型 |
+| R | 重置视角 |
+| F | 适配视图 |
 
 ### 按钮控制
 
@@ -98,21 +144,15 @@ http://localhost:8080/index-threejs.html
 - **重置视角** - 恢复默认视角
 - **适配视图** - 自动缩放以完整显示模型
 
-### 快捷键
-
-- **R** - 重置视角
-- **F** - 适配视图
-
 ## 🔧 技术架构
 
 ### 核心组件
 
 1. **Three.js** - 3D 渲染引擎
-   - CDN: https://cdn.jsdelivr.net/npm/three@0.157.0
    - 负责场景、相机、渲染器、光照等
 
-2. **OrbitControls** - 轨道控制器
-   - 提供流畅的旋转、缩放、平移交互
+2. **GLTFLoader** - GLB/GLTF 加载器
+   - 加载 GLB 和 GLTF 格式模型
 
 3. **occt-import-js** - STP 解析器
    - OpenCASCADE 的 WebAssembly 版本
@@ -123,15 +163,16 @@ http://localhost:8080/index-threejs.html
 
 ```
 STP 文件 → occt-import-js 解析 → 三角形网格 → Three.js 渲染
+GLB/GLTF 文件 → GLTFLoader 加载 → Three.js 渲染
 ```
 
 ## 📝 自定义配置
 
-### 修改模型文件
+### 修改默认模型文件
 
 ```javascript
-// 在 index-threejs.html 中找到这一行
-const stpFilePath = './your-model.stp';
+// 在 index-standalone.html 中找到这一行
+const modelFilePath = './your-model.stp';
 ```
 
 ### 修改主题颜色
@@ -144,27 +185,15 @@ background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
 background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
 ```
 
-### 修改模型材质
-
-```javascript
-// 在代码中找到这部分
-const material = new THREE.MeshPhongMaterial({
-    color: 0x667eea,        // 修改颜色
-    shininess: 100,            // 修改光泽度
-    specular: 0x444444,        // 修改高光色
-    side: THREE.DoubleSide
-});
-```
-
 ## 🐛 常见问题
 
-### Q: 页面空白或报错 "occtImportJs is not defined"
-A: 检查 `occt-import-js.js` 文件是否在同一目录下，并且文件名正确。
+### Q: 页面空白或报错
+A: 检查浏览器控制台（F12）查看具体错误信息。
 
-### Q: 报错 "Failed to fetch" 或无法加载 STP 文件
+### Q: 报错 "Failed to fetch" 或无法加载模型文件
 A: 
 1. 确保使用本地服务器运行（不要直接双击 HTML）
-2. 检查 STP 文件路径是否正确
+2. 检查模型文件路径是否正确
 3. 检查浏览器控制台的网络请求
 
 ### Q: 模型加载很慢
@@ -173,44 +202,56 @@ A:
 - 这是正常现象，因为 OCCT 解析很复杂
 - 可以查看浏览器控制台的进度
 
-### Q: 模型显示不完整或有错误
-A: 
-- 尝试用其他软件打开 STP 文件，确认文件本身没问题
-- 检查模型是否有复杂的曲面或几何体
-
 ### Q: 如何获取 occt-import-js？
 A: 
-- GitHub: https://github.com/ykob/occt-import-js
-- 可以从 Release 页面下载预构建版本
+- GitHub: https://github.com/kaaes/occt-import-js
 
 ## 📚 相关资源
 
 - **Three.js 官网**: https://threejs.org/
 - **Three.js 文档**: https://threejs.org/docs/
-- **occt-import-js**: https://github.com/ykob/occt-import-js
+- **occt-import-js**: https://github.com/kaaes/occt-import-js
 - **OpenCASCADE**: https://www.opencascade.com/
 
 ## 🎯 优势对比
 
-| 特性 | 本方案（Three.js + occt） | 其他付费方案 |
-|------|------------------------|------------|
+| 特性 | 本方案 | 其他付费方案 |
+|------|--------|------------|
 | 费用 | 🆓 完全免费 | 💰 需要付费 |
 | 开源 | ✅ 完全开源 | ❌ 闭源 |
-| STP 解析 | ✅ 专业 OCCT 引擎 | ✅ 专业引擎 |
-| 交互性 | ✅ 丰富 | ✅ 丰富 |
-| 可定制 | ✅ 高度可定制 | ⚠️ 有限 |
+| 多格式 | ✅ STP/GLB/GLTF | ⚠️ 有限 |
 | 隐私 | ✅ 本地处理 | ⚠️ 可能上传 |
 
 ## 🎉 总结
 
-这是一个**完全免费、完全开源**的方案，功能强大，可以满足大多数 STP 模型查看需求！
+这是一个**完全免费、完全开源**的方案，功能强大，可以满足大多数 3D 模型查看需求！
 
 - ✅ 无需付费
 - ✅ 无需授权
 - ✅ 本地处理，保护隐私
 - ✅ 代码完全可定制
 - ✅ 使用业界标准的 Three.js
+- ✅ 支持多种 3D 格式
 
 ---
 
 **祝你使用愉快！** 🦞✨
+
+---
+
+## 版权声明
+
+Copyright (C) 2024
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Lesser General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Lesser General Public License for more details.
+
+You should have received a copy of the GNU Lesser General Public License
+along with this program.  If not, see <https://www.gnu.org/licenses/>.
