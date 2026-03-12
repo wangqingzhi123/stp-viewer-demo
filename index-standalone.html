@@ -1122,6 +1122,12 @@
             document.getElementById('loadStatus').textContent = '加载失败';
         }
 
+        // 把控制函数暴露到全局作用域，让 HTML 的 onclick 能找到它们
+        window.toggleWireframe = toggleWireframe;
+        window.toggleAutoRotate = toggleAutoRotate;
+        window.resetCamera = resetCamera;
+        window.fitToView = fitToView;
+
         // 页面加载完成后初始化
         window.addEventListener('load', init);
     </script>
